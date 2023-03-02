@@ -20,6 +20,10 @@ state("splintercell3")
     //bool missionComplete: "splintercell3.exe", 0xA2C81C; // 1 at mission complete
 }
 
+startup {
+    settings.Add("subsplit", false, "Split when entering Seoul Part 2?");
+}
+
 isLoading {
     return (current.loadSave == 6 || current.levelLoad == 1);
 }
@@ -34,7 +38,7 @@ split {
         return (old.cutscene && !current.cutscene && current.soshoEnd);
     }
 
-    if (current.map == "09_SeoulTwo") {
+    if (!settings["subsplit"] && current.map == "09_SeoulTwo") {
         return false;
     }
 
@@ -44,5 +48,3 @@ split {
 reset {
     return (old.ResetMenu != 0 && current.ResetMenu == 0 && current.map == "01_Lighthouse");
 }
-
-
