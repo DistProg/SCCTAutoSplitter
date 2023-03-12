@@ -18,11 +18,19 @@ state("splintercell3")
     int runStart: "splintercell3.exe",  0x8F6988, 0x450, 0x9C, 0x10, 0x50, 0x820; // Used for auto-start. Jumps from 1 to 49155 or 49166 when run starts.
     bool soshoEnd: "splintercell3.exe",  0x7497D4, 0x1C; // Last mission complete Flag 1
     //bool missionComplete: "splintercell3.exe", 0xA2C81C; // 1 at mission complete
+
+    // In-game timer
+    double igt: "splintercell3.exe", 0x0090B734, 0x80, 0x14, 0x10;
 }
 
 startup
 {
     settings.Add("subsplit", false, "Split when entering Seoul Part 2?");
+    settings.Add("sync_igt", false, "Sync game time with in-game timer");
+    settings.Add("actual_igt", false, "Always display the actual in-game time", "sync_igt");
+    settings.SetToolTip("actual_igt", "Game time will go back down after a QL; Useful for practice and debugging");
+
+    vars.gameTime = 0.0;
 }
 
 isLoading
@@ -51,4 +59,29 @@ split
 reset
 {
     return (old.ResetMenu != 0 && current.ResetMenu == 0 && current.map == "01_Lighthouse");
+}
+
+gameTime {
+    if (!settings["sync_igt"]) {
+        return false;
+    }
+
+    if (settings["actual_igt"]) {
+        if (current.igt != null) {
+            vars.gameTime = current.igt;
+        }
+    } else if (
+        current.loadSave != 6
+        && current.igt != null
+        && old.igt != null
+        && current.igt > old.igt
+    ) {
+        vars.gameTime += current.igt - old.igt;
+    }
+
+    return TimeSpan.FromSeconds(vars.gameTime);
+}
+
+onReset {
+    vars.gameTime = 0.0;
 }
