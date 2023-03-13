@@ -46,12 +46,10 @@ update {
     }
 
     if (!vars.inLevel && old.igt != current.igt) {
-        print("enter level");
         vars.inLevel = true;
     }
 
     if (!old.missionEnd && current.missionEnd) {
-        print("leave level");
         vars.inLevel = false;
     }
 }
