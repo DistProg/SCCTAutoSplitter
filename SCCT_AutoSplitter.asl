@@ -45,11 +45,11 @@ update {
         vars.time = DateTime.Now;
     }
 
-    if (!vars.inLevel && old.igt != current.igt) {
+    if (!vars.inLevel && old.igt != current.igt && current.igt == 0) {
         vars.inLevel = true;
     }
 
-    if (!old.missionEnd && current.missionEnd) {
+    if (vars.inLevel && !old.missionComplete && current.missionComplete) {
         vars.inLevel = false;
     }
 }
