@@ -25,9 +25,11 @@ startup
     settings.Add("sync_igt", false, "Sync Game Time with in-game timer");
     settings.Add("actual_igt", false, "Always display the actual in-game time", "sync_igt");
     settings.Add("il_mode", false, "IL Mode");
+    settings.Add("il_noql", false, "No QS/QL Mode", "il_mode");
 
     settings.SetToolTip("actual_igt", "Game Time will go back down after a QL; Useful for practice and debugging");
     settings.SetToolTip("il_mode", "Auto-start in every mission and split at the mission complete screen");
+    settings.SetToolTip("il_noql", "Auto-start after the loadout selection instead (use with IGT sync setting)");
 
     // Tracks Game Time synced with the game
     vars.gameTime = 0.0d;
@@ -43,14 +45,14 @@ update {
     if (settings["sync_igt"]) {
         vars.prevTime = vars.time;
         vars.time = DateTime.Now;
-    }
 
-    if (!vars.inLevel && old.igt != current.igt && current.igt == 0) {
-        vars.inLevel = true;
-    }
+        if (!vars.inLevel && old.igt != current.igt && current.igt == 0) {
+            vars.inLevel = true;
+        }
 
-    if (vars.inLevel && !old.missionComplete && current.missionComplete) {
-        vars.inLevel = false;
+        if (vars.inLevel && !old.missionComplete && current.missionComplete) {
+            vars.inLevel = false;
+        }
     }
 }
 
@@ -66,7 +68,7 @@ isLoading
 
 start
 {
-    if (settings["il_mode"]) {
+    if (settings["il_mode"] && settings["il_noql"]) {
         // Start when the IGT resets to 0
         return old.igt != 0 && current.igt == 0;
     } else {
@@ -77,7 +79,7 @@ start
 
 split
 {
-    if (settings["il_mode"]) {
+    if (settings["il_mode"] && settings["il_noql"]) {
         if (!old.missionComplete && current.missionComplete) {
             return true;
         }
@@ -122,4 +124,5 @@ gameTime {
 
 onReset {
     vars.gameTime = 0.0;
+    vars.inLevel = false;
 }
