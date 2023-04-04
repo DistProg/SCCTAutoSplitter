@@ -1,50 +1,142 @@
-// SCCT AutoSplitter by Distro
-// This current version is for testing purposes only. If it proves to work for everyone, there will be code cleanup.
-// Please leave some feedback on how well the autosplitter works and report bugs to Distro.
+// SCCT AutoSplitter by Distro and Buttercak3
 
 state("splintercell3")
-{	
-    //Load Removal
-    bool isMenu: "splintercell3.exe", 0x8FA4E8, 0xF8; // Flag that tells you when we're in the menu. Only necessary if you use either LevelTime or LoadTime. Can also be used in the future if we want to pause the timer in menus.
-    bool cutscene: "binkw32.dll", 0x54AB4; // Flag that tells you when a cutscene is running. Only necessary if you use either LevelTime or LoadTime.   
-    //int loadSave: "splintercell3.exe", 0x29A560, 0xC, 0x134; // set to 6 during QS or QL
-    int loadSave: "splintercell3.exe", 0xA16A08, 0xC, 0x134; // set to 6 during QS or QL
-    int levelLoad: "splintercell3.exe", 0x8C8B38; // used as flag because the value stays at 1 when loading a level.
+{
+    // Load removal
+    bool cutscene: "binkw32.dll", 0x54AB4;
+    bool qsql: "splintercell3.exe", 0x9327E8;
+    int isLoading: "splintercell3.exe", 0x8C8B38;
 
-    //Splitting behavior
-	string255 map: "splintercell3.exe", 0x73E6CC, 0x4; 
-	int ResetMenu: "splintercell3.exe",  0xA17608, 0x184; // Used for auto-reset. Turns to 0 when Press Fire to Load Screen is done loading on Lighthouse.
-    //int runStart: "splintercell3.exe",  0x1079F4, 0x94; // Used for auto-start. Jumps from 1 to 49155 or 49166 when run starts.
-	int runStart: "splintercell3.exe",  0x8F6988, 0x450, 0x9C, 0x10, 0x50, 0x820; // Used for auto-start. Jumps from 1 to 49155 or 49166 when run starts.
-    bool soshoEnd: "splintercell3.exe",  0x7497D4, 0x1C; // Last mission complete Flag 1
-    //bool missionComplete: "splintercell3.exe", 0xA2C81C; // 1 at mission complete
+    // Splitting behavior
+    int runStart: "splintercell3.exe", 0x8F6988, 0x450, 0x9C, 0x10, 0x50, 0x820;
+    string255 mapName: "splintercell3.exe", 0x73E6CC, 0x4;
+    int inResetMenu: "splintercell3.exe",  0xA17608, 0x184;
+    bool soshoEnd: "splintercell3.exe",  0x7497D4, 0x1C;
+    bool missionComplete: "splintercell3.exe", 0xA2C81C;
+
+    // In-game timer
+    double igt: "splintercell3.exe", 0x0090B734, 0x10, 0x14, 0x80;
 }
 
-startup {
-    settings.Add("subsplit", false, "Split when entering Seoul Part 2?");
+startup
+{
+    settings.Add("subsplit", false, "Split when entering Seoul Part 2");
+    settings.Add("coop_mode", false, "[Experimental] Co-op mode");
+    settings.Add("sync_igt", false, "[Experimental] Sync Game Time with in-game timer");
+    settings.Add("actual_igt", false, "Always display the actual in-game time", "sync_igt");
+    settings.Add("il_mode", false, "[Experimental] IL Mode");
+    settings.Add("il_noql", false, "No QS/QL Mode", "il_mode");
+
+    settings.SetToolTip("actual_igt", "Game Time will go back down after a QL; Useful for practice and debugging");
+    settings.SetToolTip("il_mode", "Auto-start in every mission and split at the mission complete screen");
+    settings.SetToolTip("il_noql", "Auto-start after the loadout selection instead (use with IGT sync setting)");
+    settings.SetToolTip("coop_mode", "Auto-start when the IGT starts in any level");
+
+    // Tracks Game Time synced with the game
+    vars.gameTime = 0.0d;
+
+    // Used to track real-time whenever IGT is not available
+    vars.prevTime = DateTime.Now;
+    vars.time = DateTime.Now;
+
+    vars.inLevel = false;
 }
 
-isLoading {
-    return (current.loadSave == 6 || current.levelLoad == 1);
+update {
+    if (settings["sync_igt"]) {
+        vars.prevTime = vars.time;
+        vars.time = DateTime.Now;
+
+        if (!vars.inLevel && old.igt != current.igt && current.igt == 0) {
+            vars.inLevel = true;
+        }
+
+        if (vars.inLevel && !old.missionComplete && current.missionComplete) {
+            vars.inLevel = false;
+        }
+    }
 }
 
-start {
-	return (current.runStart == 49155 || current.runStart == 49156 || current.runStart == 49166);
+isLoading
+{
+    if (settings["sync_igt"]) {
+        // Returning a constant true value will prevent LiveSplit from interpolating Game Time between ticks.
+        return true;
+    } else {
+        return current.qsql || current.isLoading == 1;
+    }
 }
 
-split {  
-    
-    if (current.map == "11_KokuboSosho") {
+start
+{
+    if (settings["coop_mode"]) {
+        return old.igt != 0 && current.igt == 0;
+    } else if (settings["il_mode"]) {
+        if (settings["il_noql"]) {
+            // Start when the IGT resets to 0
+            return old.igt == 0 && current.igt != 0;
+        } else {
+            return !old.cutscene && current.cutscene;
+        }
+    } else if (current.runStart == 49155 || current.runStart == 49156 || current.runStart == 49166) {
+        vars.inLevel = false;
+        return true;
+    }
+}
+
+split
+{
+    if (settings["coop_mode"] && current.mapName == "05_NuclearPlant") {
+        return !old.missionComplete && current.missionComplete;
+    }
+
+    if (settings["il_mode"] && settings["il_noql"]) {
+        if (!old.missionComplete && current.missionComplete) {
+            return true;
+        }
+    }
+
+    if (current.mapName == "11_KokuboSosho") {
         return (old.cutscene && !current.cutscene && current.soshoEnd);
     }
 
-    if (!settings["subsplit"] && current.map == "09_SeoulTwo") {
+    if (!settings["subsplit"] && current.mapName == "09_SeoulTwo") {
         return false;
     }
 
-	return (current.map != old.map && current.map != "menu" && current.map != "01_Lighthouse");
+    return (current.mapName != old.mapName && current.mapName != "menu" && current.mapName != "01_Lighthouse");
 }
 
-reset {
-    return (old.ResetMenu != 0 && current.ResetMenu == 0 && current.map == "01_Lighthouse");
+reset
+{
+    if (!settings["il_mode"]) {
+        return (old.inResetMenu != 0 && current.inResetMenu == 0 && current.mapName == "01_Lighthouse");
+    }
+}
+
+gameTime
+{
+    if (!settings["sync_igt"]) {
+        return null;
+    } else if (settings["actual_igt"]) {
+        return TimeSpan.FromSeconds(current.igt);
+    } else if (current.isLoading == 1) {
+        return TimeSpan.FromSeconds(vars.gameTime);
+    } else if (!vars.inLevel || (current.igt == old.igt && !current.qsql)) {
+        // Whenever we're not playing, use real-time.
+        vars.gameTime += (vars.time - vars.prevTime).TotalMilliseconds / 1000.0;
+    } else if (current.igt >= old.igt + 2) {
+        // When the IGT does a large jump (more than 2 seconds), use real-time instead.
+        // This can happen between levels or when going to the menu.
+        vars.gameTime += (vars.time - vars.prevTime).TotalMilliseconds / 1000.0;
+    } else if (current.igt > old.igt) {
+        vars.gameTime += current.igt - old.igt;
+    }
+
+    return TimeSpan.FromSeconds(vars.gameTime);
+}
+
+onReset
+{
+    vars.gameTime = 0.0;
 }
