@@ -5,10 +5,10 @@ state("splintercell3")
     // Load removal
     bool cutscene: "binkw32.dll", 0x54AB4;
     bool qsql: "splintercell3.exe", 0x9327E8;
-    int isLoading: "splintercell3.exe", 0x8C8B38;
+    int isLoading: "splintercell3.exe", 0x8C8B38; 
 
     // Splitting behavior
-    int runStart: "splintercell3.exe", 0x8F6988, 0x450, 0x9C, 0x10, 0x50, 0x820;
+    // int runStart: "splintercell3.exe", 0x8F6988, 0x450, 0x9C, 0x10, 0x50, 0x820;
     string255 mapName: "splintercell3.exe", 0x73E6CC, 0x4;
     int inResetMenu: "splintercell3.exe",  0xA17608, 0x184;
     bool soshoEnd: "splintercell3.exe",  0x7497D4, 0x1C;
@@ -63,7 +63,7 @@ isLoading
         // Returning a constant true value will prevent LiveSplit from interpolating Game Time between ticks.
         return true;
     } else {
-        return current.qsql || current.isLoading == 1;
+        return current.isLoading == 1;
     }
 }
 
@@ -78,7 +78,7 @@ start
         } else {
             return !old.cutscene && current.cutscene;
         }
-    } else if (current.runStart == 49155 || current.runStart == 49156 || current.runStart == 49166) {
+    } else if (!old.cutscene && current.cutscene) {
         vars.inLevel = false;
         return true;
     }
